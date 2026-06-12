@@ -20,6 +20,12 @@ oven_on_delay = 0.0
 oven_off_delay = 0.0
 power = 0.0
 
+def pid_coefs(T):
+    Kp = (1/6 - 1/12)/(250 - 50)*(T - 50) + 1/12
+    Ki = 0.0008
+    Kd = (0.5 - 0.8)/(250 - 50)*(T - 50) + 0.8
+    return Kp, Ki, Kd
+
 def pid():
     global oven_on_delay, oven_off_delay, i_err, power
 
@@ -34,8 +40,10 @@ def pid():
     
     d_err = (2*h0 + h1)/(h0*(h0 + h1))*filt_temp[2] - (h0 + h1)/(h0*h1)*filt_temp[1] + h0/(h1*(h0 + h1)) * filt_temp[0]
     i_err = i_err + (2 * target - filt_temp[2] - filt_temp[1])/2*h0
-    print(0.0008 * i_err)
-    P = 0.15 * err + 0.0008 * i_err - 0.7 * d_err
+
+    Kp, Ki, Kd = pid_coefs(filt_temp[2])
+    P = Kp * err + Ki * i_err - Kd * d_err
+    #P = 0.15 * err + 0.0008 * i_err - 0.7 * d_err
     P = max(P, 0.0)
     P = min(P, 1.0)
 
