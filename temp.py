@@ -1,38 +1,115 @@
 import time
 import machine as mc
+import asyncio
 
+# Pins
 cs = mc.Pin(17, mode=mc.Pin.OUT, value=1)
 run = mc.Pin(15, mode=mc.Pin.OUT, value=0)
 max6675_0 = mc.SPI(0)
-filteredTemp = 0
-alpha = 0.4
 
-temp0 = 0.0
-temp1 = 0.0
-temp2 = 0.0
+# Variables
+filt_temp = [0.0, 0.0, 0.0]
+ts = [0.0, 0.0, 0.0]
+alpha = 0.35
+target = 165
+i_err = 0.0
 
-while True:
-    cs(0)
-    data = int.from_bytes(max6675_0.read(2))
-    cs(1)
+# PID output
+oven_on_delay = 0.0
+oven_off_delay = 0.0
+
+
+def pid():
+    global oven_on_delay, oven_off_delay, i_err
+
+    # Calculate PID output
+    err = target - filt_temp[2]
+
+    h0 = time.ticks_diff(ts[2], ts[1]) / 1000
+    h1 = time.ticks_diff(ts[1], ts[0]) / 1000
+
+    if h0 <= 0 or h1 <= 0:
+        return
     
-    if data & 0x0004:
-        print('ERROR THERMOCOUPLE SHORTED')
+    d_err = (2*h0 + h1)/(h0*(h0 + h1))*filt_temp[2] - (h0 + h1)/(h0*h1)*filt_temp[1] + h0/(h1*(h0 + h1)) * filt_temp[0]
+    i_err = i_err + (2 * target - filt_temp[2] - filt_temp[1])/2*h0
+    print(0.0008 * i_err)
+    P = 0.15 * err + 0.0008 * i_err - 0.7 * d_err
+    P = max(P, 0.0)
+    P = min(P, 1.0)
+
+    oven_on_delay = int(P * 200)
+    oven_off_delay = int((1 - P) * 200)
+
+
+
+async def max6675_reading():
+    temp = [0.0, 0.0, 0.0]
+    while True:
+        # Read MAX6675 data
+        cs(0)
+        data = int.from_bytes(max6675_0.read(2))
+        ts[0] = ts[1]
+        ts[1] = ts[2]
+        ts[2] = time.ticks_ms()
+        cs(1)
     
-    temp0 = temp1
-    temp1 = temp2
-    temp2 = (data >> 3) * 0.25
+        # Check if data correct
+        if data & 0x0004:
+            print('ERROR THERMOCOUPLE SHORTED')
+        
+        temp[0] = temp[1]
+        temp[1] = temp[2]
+        temp[2] = (data >> 3) * 0.25
+        
+        filt_temp[0] = filt_temp[1]
+        filt_temp[1] = filt_temp[2]
+        filt_temp[2] = alpha * sorted(temp)[1] + (1 - alpha) * filt_temp[2]
+        
+        print('%0.1f/%0.1f' % (filt_temp[2], target))
+        pid()
+        await asyncio.sleep_ms(250)
 
-    temp = sorted([temp0, temp1, temp2])[1]
-
-    filteredTemp = temp #alpha * temp + (1 - alpha) * filteredTemp
-    print('Temp is', filteredTemp)
-
-    if filteredTemp > 200.0:
-        print('halt')
-        run(0)
-    else:
-        print('run')
+async def oven_ctl():
+    while True:
         run(1)
+        await asyncio.sleep_ms(oven_on_delay)
+        run(0)
+        await asyncio.sleep_ms(oven_off_delay)
 
-    time.sleep(0.25)
+async def main():
+    await asyncio.gather(
+        max6675_reading(),
+        oven_ctl()
+    )
+
+try:
+    asyncio.run(main())
+except KeyboardInterrupt:
+    run(0)
+    print('End')
+# while True:
+    # cs(0)
+    # data = int.from_bytes(max6675_0.read(2))
+    # cs(1)
+    
+    # if data & 0x0004:
+    #     print('ERROR THERMOCOUPLE SHORTED')
+    
+    # temp0 = temp1
+    # temp1 = temp2
+    # temp2 = (data >> 3) * 0.25
+
+    # temp = sorted([temp0, temp1, temp2])[1]
+
+    # filteredTemp = temp #alpha * temp + (1 - alpha) * filteredTemp
+    # print('Temp is', filteredTemp)
+
+#     if filteredTemp > 200.0:
+#         print('halt')
+#         run(0)
+#     else:
+#         print('run')
+#         run(1)
+
+#     time.sleep(0.25)
