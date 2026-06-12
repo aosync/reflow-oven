@@ -13,14 +13,15 @@ ts = [0.0, 0.0, 0.0]
 alpha = 0.35
 target = 165
 i_err = 0.0
+pwm_window = 200
 
 # PID output
 oven_on_delay = 0.0
 oven_off_delay = 0.0
-
+power = 0.0
 
 def pid():
-    global oven_on_delay, oven_off_delay, i_err
+    global oven_on_delay, oven_off_delay, i_err, power
 
     # Calculate PID output
     err = target - filt_temp[2]
@@ -38,10 +39,9 @@ def pid():
     P = max(P, 0.0)
     P = min(P, 1.0)
 
-    oven_on_delay = int(P * 200)
-    oven_off_delay = int((1 - P) * 200)
-
-
+    power = 2 * P - 1
+    oven_on_delay = int(P * pwm_window)
+    oven_off_delay = int((1 - P) * pwm_window)
 
 async def max6675_reading():
     temp = [0.0, 0.0, 0.0]
@@ -68,9 +68,27 @@ async def max6675_reading():
         
         print('%0.1f/%0.1f' % (filt_temp[2], target))
         pid()
-        await asyncio.sleep_ms(250)
+        await asyncio.sleep_ms(225)
 
-async def oven_ctl():
+async def oven_delta_sigma():
+    MAINS_FREQ = 50
+    MAINS_PERIOD_MS = int(1000 / MAINS_FREQ + 0.5)
+
+    fire = 0
+    res = 0
+    while True:
+        res += power - fire
+        fire = 1 if res >= 0 else -1
+        
+        if fire == 1:
+            run(1)
+        else:
+            run(0)
+
+        await asyncio.sleep_ms(MAINS_PERIOD_MS)
+
+
+async def oven_pwm():
     while True:
         run(1)
         await asyncio.sleep_ms(oven_on_delay)
@@ -80,7 +98,7 @@ async def oven_ctl():
 async def main():
     await asyncio.gather(
         max6675_reading(),
-        oven_ctl()
+        oven_delta_sigma()
     )
 
 try:
