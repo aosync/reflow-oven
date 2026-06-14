@@ -12,7 +12,7 @@ max6675_0 = mc.SPI(0)
 filt_temp = [0.0, 0.0, 0.0]
 ts = [0.0, 0.0, 0.0]
 alpha = 0.5
-target = 205
+target = 0
 i_err = 0.0
 pwm_window = 220
 
