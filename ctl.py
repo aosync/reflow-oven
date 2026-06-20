@@ -95,14 +95,39 @@ def wait_until(cond, delay=0.25):
 
         time.sleep(delay)
 
+def profile_leaded(speed=0.5, temp=0.5):
+    liq = 183
+    soak = (140, 160)
+    soak_duration = 60 * speed + 120 * (1 - speed)
+    peak = 230 * temp + 210 * (1 - temp)
+    tal = 45 * speed + 75 * (1 - speed)
+    return liq, soak, soak_duration, peak, tal
+
+def profile_leadfree(speed=0.5, temp=0.5):
+    liq = 217
+    soak = (150, 200)
+    soak_duration = 60 * speed + 120 * (1 - speed)
+    peak = 250 * temp + 235 * (1 - temp)
+    tal = 45 * speed + 90 * (1 - speed)
+    return liq, soak, soak_duration, peak, tal
+
+def profile_lt(speed=0.5, temp=0.5):
+    liq = 138
+    soak = (90, 120)
+    soak_duration = 30 * speed + 90 * (1 - speed)
+    peak = 190 * temp + 165 * (1 - temp)
+    tal = 45 * speed + 90 * (1 - speed)
+    return liq, soak, soak_duration, peak, tal
+
+liq, soak, soak_duration, peak, tal = profile_leadfree()
 
 octl.setpoint(octl.T())
-octl.ramp(1.5, 130)
-wait_until(lambda t, T: T >= 130)
-octl.ramp(0.4, 170)
-wait_until(lambda t, T: T >= 170)
-octl.ramp(1.2, 245)
-wait_until(lambda t, T: T >= 217)
-wait_until(lambda t, T: t >= 60)
+octl.ramp(1.5, soak[0])
+wait_until(lambda t, T: T >= soak[0])
+octl.ramp((soak[1] - soak[0]) / soak_duration, soak[1])
+wait_until(lambda t, T: T >= soak[1])
+octl.ramp(1.2, peak)
+wait_until(lambda t, T: T >= liq)
+wait_until(lambda t, T: t >= tal)
 octl.ramp(4.5, 20)
 wait_until(lambda t, T: T <= 20)
