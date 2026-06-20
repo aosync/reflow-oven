@@ -54,8 +54,8 @@ def pid_coefs(T):
     #Kd = (0.4 - 1.0)/(250 - 50)*(T - 50) + 0.7
     
     Kp = 0.25
-    Ki = 0.0008
-    Kd = 1.2
+    Ki = 0.0004
+    Kd = 0.7
     return Kp, Ki, Kd
 
 ramp_start_t = 0
@@ -86,20 +86,18 @@ def pid():
 
     # Calculate PID output
     r, dr = setpoint()
-    err = r - filt_temp[2]
+    err = r - filt_temp[1]
 
-    h0 = time.ticks_diff(ts[2], ts[1]) / 1000
-    h1 = time.ticks_diff(ts[1], ts[0]) / 1000
+    h0 = time.ticks_diff(ts[1], ts[0]) / 1000
 
-    if h0 <= 0 or h1 <= 0:
+    if h0 <= 0:
         return
     
-    d_err = pid_d((2*h0 + h1)/(h0*(h0 + h1))*filt_temp[2] - (h0 + h1)/(h0*h1)*filt_temp[1] + h0/(h1*(h0 + h1)) * filt_temp[0]) - dr
-    d_err = pid_d((filt_temp[2] - filt_temp[1]) / h0) - dr
+    d_err = pid_d((filt_temp[1] - filt_temp[0]) / h0) - dr
     i_err_last = i_err
-    i_err = i_err + (2 * r - filt_temp[2] - filt_temp[1])/2*h0
+    i_err = i_err + (2 * r - filt_temp[1] - filt_temp[0])/2*h0
 
-    Kp, Ki, Kd = pid_coefs(filt_temp[2])
+    Kp, Ki, Kd = pid_coefs(filt_temp[1])
     
     # Clamp integral term
     if Ki * i_err > 1.0:
@@ -109,10 +107,6 @@ def pid():
     
     # Calculate output
     P = Kp * err + Ki * i_err - Kd * d_err
-    #print(Kp, Ki, Kd)
-    #print(Ki * i_err)
-    #print(P)
-    #P = 0.15 * err + 0.0008 * i_err - 0.7 * d_err
     P = max(P, 0.0)
     P = min(P, 1.0)
 
@@ -126,29 +120,17 @@ def pid():
     oven_off_delay = int((1 - P) * pwm_window)
 
 async def max6675_reading():
-    temp = RollingMedian(3)
     while True:
         # Read MAX6675 data
         cs(0)
         data = int.from_bytes(max6675_0.read(2))
         ts[0] = ts[1]
-        ts[1] = ts[2]
-        ts[2] = time.ticks_ms()
+        ts[1] = time.ticks_ms()
         cs(1)
-    
-        # Check if data correct
-        #if data & 0x0004:
-        #    print('ERROR THERMOCOUPLE SHORTED')
-        
-        temp[0] = temp[1]
-        temp[1] = temp[2]
-        temp[2] = (data >> 3) * 0.25
         
         filt_temp[0] = filt_temp[1]
-        filt_temp[1] = filt_temp[2]
-        filt_temp[2] = alpha * sorted(temp)[1] + (1 - alpha) * filt_temp[2]
+        filt_temp[1] = (data >> 3) * 0.25
         
-        #print('%0.1f/%0.1f' % (filt_temp[2], target))
         pid()
         await asyncio.sleep_ms(225)
 
@@ -204,9 +186,9 @@ async def serial_if():
             ramp_start_T, ramp_start_t, ramp_rate, target = target, time.ticks_ms(), rr, rt
             print('0', rt)
         elif cmd[0] == 'v':
-            print('0', filt_temp[2])
+            print('0', filt_temp[1])
         elif cmd[0] == 'z':
-            print('0', filt_temp[2], setpoint()[0])
+            print('0', filt_temp[1], setpoint()[0])
         else:
             print('1')
 
