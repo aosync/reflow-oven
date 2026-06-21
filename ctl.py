@@ -95,28 +95,28 @@ def wait_until(cond, delay=0.25):
 
         time.sleep(delay)
 
-def profile_leaded(speed=0.5, temp=0.5):
+def profile_leaded(soak_speed=0.0, tal_speed=1.0, temp=0.5):
     liq = 183
     soak = (140, 160)
-    soak_duration = 60 * speed + 120 * (1 - speed)
+    soak_duration = 60 * soak_speed + 120 * (1 - soak_speed)
     peak = 230 * temp + 210 * (1 - temp)
-    tal = 45 * speed + 75 * (1 - speed)
+    tal = 45 * tal_speed + 75 * (1 - tal_speed)
     return liq, soak, soak_duration, peak, tal
 
-def profile_leadfree(speed=0.5, temp=0.5):
+def profile_leadfree(soak_speed=0.0, tal_speed=1.0, temp=0.5):
     liq = 217
     soak = (150, 200)
-    soak_duration = 60 * speed + 120 * (1 - speed)
+    soak_duration = 60 * soak_speed + 120 * (1 - soak_speed)
     peak = 250 * temp + 235 * (1 - temp)
-    tal = 45 * speed + 90 * (1 - speed)
+    tal = 45 * tal_speed + 90 * (1 - tal_speed)
     return liq, soak, soak_duration, peak, tal
 
-def profile_lt(speed=0.5, temp=0.5):
+def profile_lt(soak_speed=0.0, tal_speed=1.0, temp=0.5):
     liq = 138
     soak = (90, 120)
-    soak_duration = 30 * speed + 90 * (1 - speed)
+    soak_duration = 30 * soak_speed + 90 * (1 - soak_speed)
     peak = 190 * temp + 165 * (1 - temp)
-    tal = 45 * speed + 90 * (1 - speed)
+    tal = 45 * tal_speed + 90 * (1 - tal_speed)
     return liq, soak, soak_duration, peak, tal
 
 liq, soak, soak_duration, peak, tal = profile_leadfree()
